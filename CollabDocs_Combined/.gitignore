@@ -1,0 +1,19 @@
+# Secrets
+.env
+
+# Virtual environments
+.collabenv/
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Local databases / static
+db.sqlite3
+staticfiles/
+
+# Editors
+.vscode/
+.idea/
