@@ -16,7 +16,11 @@ and an audit log. It combines three implementations; see
 | `core/` | shared | authorization policy (`access.py`), request context + middleware, test fixture |
 | `config/` | shared | settings (env-driven), root URLs |
 
-Stack: Python 3.14, Django 6.0, DRF 3.18, PostgreSQL (psycopg 3).
+Stack: Python 3.12+ (developed on 3.14), Django 6.0, DRF 3.18, PostgreSQL (psycopg 3).
+
+**Demo video:** <PASTE LOOM / GOOGLE DRIVE LINK HERE>
+
+**Postman collection:** [`CollabDocs.postman_collection.json`](CollabDocs.postman_collection.json) (repository root)
 
 ### Endpoints (all under `/api/`)
 
@@ -35,20 +39,25 @@ The sections below document setup and, in detail, the documents & versions API.
 
 ## 1. Installation
 
-The virtual environment is `.colab`, in the folder **above** the project
-(`D:\CollabDocuments\.colab`). Run all commands from `CollabDocs_Combined/`:
+Requires Python 3.12 or newer (Django 6.0). Clone the repository and run all
+commands from the project root (the folder containing `manage.py`):
+
+```bash
+git clone https://github.com/bhomik27/CollabDocs.git
+cd CollabDocs
+```
 
 ```powershell
-# PowerShell
-python -m venv ..\.colab                 # first time only
-..\.colab\Scripts\Activate.ps1           # if blocked: Set-ExecutionPolicy -Scope Process Bypass
+# Windows PowerShell
+python -m venv venv                      # first time only
+.\venv\Scripts\Activate.ps1             # if blocked: Set-ExecutionPolicy -Scope Process Bypass
 pip install -r requirements.txt
 ```
 
 ```bash
 # Git Bash / macOS / Linux
-python -m venv ../.colab                 # first time only
-source ../.colab/Scripts/activate        # macOS/Linux: source ../.colab/bin/activate
+python -m venv venv                      # first time only
+source venv/Scripts/activate             # macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -66,7 +75,9 @@ cp .env.example .env      # then edit .env; it is git-ignored
 | `DJANGO_DEBUG` | `true` for local development |
 | `DJANGO_ALLOWED_HOSTS` | comma-separated |
 | `POSTGRES_DB / _USER / _PASSWORD / _HOST / _PORT` | PostgreSQL connection |
+| `POSTGRES_CONN_MAX_AGE` | persistent connection lifetime in seconds |
 | `USE_SQLITE` | `true` only on a machine without PostgreSQL (see the testing notes) |
+| `DOCUMENTS_LOG_LEVEL` | log level for the documents app (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 
 ## 3. Create the PostgreSQL database
 
@@ -77,7 +88,9 @@ CREATE DATABASE collabdocs OWNER collabdocs;
 ALTER USER collabdocs CREATEDB;   -- lets the test runner create test_collabdocs
 ```
 
-## 4. Migrate, check, run
+## 4. Apply migrations, check, run
+
+All migrations are committed. Apply them to the configured database:
 
 ```bash
 python manage.py migrate
@@ -189,11 +202,23 @@ return 400 with a message per parameter, and so does `updated_after` later than
 
 ### Postman
 
-Import `postman/CollabDocs_PersonB_Documents.postman_collection.json`. Set
-`base_url`, then either run **Auth → Obtain token** or paste a token from
-`POST /api/users/login/`, and set `workspace_id`. "Create document" stores `document_id`
-and "List versions" stores `version_id`. Every request has status-code tests
-and saved example responses.
+Import `CollabDocs.postman_collection.json` from the repository root. It covers
+every endpoint, organised into folders: **Users, Workspaces, Documents,
+Comments, Tags, Audit Logs**, with sample bodies for all POST, PUT and PATCH
+requests.
+
+1. Start the server (`python manage.py runserver`). The collection variable
+   `base_url` defaults to `http://127.0.0.1:8000`.
+2. Run the folders in order, starting with **Users**. The register requests
+   create four test users (alice = admin, bob = editor, carol = viewer,
+   dave = outsider) and store their tokens automatically. Later requests
+   store `workspace_id`, `document_id`, `version_id`, `comment_id`, `tag_id`
+   and `audit_id` for the requests that follow.
+3. Every request has a status-code test. Requests named "(403)", "(401)" or
+   "Outsider gets 404" check the permission rules.
+
+The aggregation endpoints are **Workspace stats** and **Document stats**. The
+signal-written audit trail is under **Audit Logs**.
 
 ---
 
@@ -329,5 +354,5 @@ documents/
 comments/          Comment (threaded), list/create/detail
 tags/              Tag, DocumentTag (+ Tag.documents M2M), attach/detach
 audit/             AuditLog, registry + signals, read-only API, check_integration command
-postman/           Person B Postman collection
+CollabDocs.postman_collection.json   Postman collection (all endpoints)
 ```
