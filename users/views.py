@@ -6,6 +6,8 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 
+from core.utils import parse_query_value
+
 from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
 
 User = get_user_model()
@@ -20,6 +22,7 @@ class IsSelf(BasePermission):
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by("username")
+    pagination_class = None  # list keeps returning a plain JSON array (Person A's API contract)
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -43,10 +46,10 @@ class UserViewSet(viewsets.ModelViewSet):
             qs = qs.filter(Q(username__icontains=search) | Q(email__icontains=search))
         ids = params.get("ids")
         if ids:  # __in lookup
-            qs = qs.filter(id__in=ids.split(","))
+            qs = qs.filter(id__in=[parse_query_value(User, "pk", "ids", i.strip()) for i in ids.split(",") if i.strip()])
         joined_after = params.get("joined_after")
         if joined_after:  # __gte lookup
-            qs = qs.filter(date_joined__gte=joined_after)
+            qs = qs.filter(date_joined__gte=parse_query_value(User, "date_joined", "joined_after", joined_after))
         return qs
 
     def create(self, request, *args, **kwargs):

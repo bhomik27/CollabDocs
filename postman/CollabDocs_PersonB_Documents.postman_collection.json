@@ -1,0 +1,1531 @@
+{
+  "info": {
+    "name": "CollabDocs - Person B - Documents & Versions",
+    "description": "Documents and DocumentVersion endpoints (Person B).\n\nSetup: run `python manage.py seed_demo`, then set `token` (alice=admin, bob=editor, carol=viewer, dave=non-member) and `workspace_id` from its output. Or call 'Obtain token' first.\nRun 'Create document' first: it stores `document_id`; 'List versions' stores `version_id`.\n'Delete document' is in its own folder so a collection run ends with it.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "workspace_id",
+      "value": ""
+    },
+    {
+      "key": "document_id",
+      "value": ""
+    },
+    {
+      "key": "version_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth (temporary)",
+      "item": [
+        {
+          "name": "Obtain token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.collectionVariables.set(\"token\", pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/token/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "token"
+              ]
+            },
+            "description": "TEMPORARY standalone login (DRF authtoken). Replace with Person A's auth endpoint after integration.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"bob\",\n  \"password\": \"collabdocs-demo-123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/auth/token/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "token"
+                  ]
+                },
+                "description": "TEMPORARY standalone login (DRF authtoken). Replace with Person A's auth endpoint after integration.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"bob\",\n  \"password\": \"collabdocs-demo-123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"token\": \"<40-char token>\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Create document",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", function () { pm.response.to.have.status(201); });",
+                  "const doc = pm.response.json();",
+                  "pm.collectionVariables.set(\"document_id\", doc.id);",
+                  "pm.test(\"Initial version is 1\", function () { pm.expect(doc.version_count).to.eql(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents"
+              ]
+            },
+            "description": "Creates the document and its version 1 in one transaction.atomic() block. Requires admin or editor role in the workspace. created_by is taken from the token.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"API Design\",\n  \"content\": \"Draft 1\",\n  \"workspace\": \"{{workspace_id}}\",\n  \"status\": \"draft\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents"
+                  ]
+                },
+                "description": "Creates the document and its version 1 in one transaction.atomic() block. Requires admin or editor role in the workspace. created_by is taken from the token.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"API Design\",\n  \"content\": \"Draft 1\",\n  \"workspace\": \"{{workspace_id}}\",\n  \"status\": \"draft\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n  \"title\": \"API Design\",\n  \"content\": \"Draft 1\",\n  \"workspace\": \"6485111c-25b7-4b51-831b-bde5f700c069\",\n  \"status\": \"draft\",\n  \"tags\": [],\n  \"created_by\": {\n    \"id\": \"2\",\n    \"username\": \"bob\"\n  },\n  \"version_count\": 1,\n  \"created_at\": \"2026-10-09T07:58:36.160361Z\",\n  \"updated_at\": \"2026-10-09T07:58:36.160372Z\"\n}"
+            },
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents"
+                  ]
+                },
+                "description": "Creates the document and its version 1 in one transaction.atomic() block. Requires admin or editor role in the workspace. created_by is taken from the token.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"API Design\",\n  \"content\": \"Draft 1\",\n  \"workspace\": \"{{workspace_id}}\",\n  \"status\": \"draft\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"title\": [\n    \"Title cannot be blank.\"\n  ],\n  \"status\": [\n    \"\\\"deleted\\\" is not a valid status. Choose one of: draft, published, archived.\"\n  ]\n}"
+            },
+            {
+              "name": "403 Forbidden (viewer)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents"
+                  ]
+                },
+                "description": "Creates the document and its version 1 in one transaction.atomic() block. Requires admin or editor role in the workspace. created_by is taken from the token.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"API Design\",\n  \"content\": \"Draft 1\",\n  \"workspace\": \"{{workspace_id}}\",\n  \"status\": \"draft\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Only workspace admins and editors can create documents.\",\n  \"code\": \"permission_denied\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List documents",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents"
+              ]
+            },
+            "description": "Paginated (20 per page). Only documents in the caller's workspaces. Rows omit `content`."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents"
+                  ]
+                },
+                "description": "Paginated (20 per page). Only documents in the caller's workspaces. Rows omit `content`."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"count\": 1,\n  \"next\": null,\n  \"previous\": null,\n  \"results\": [\n    {\n      \"id\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n      \"title\": \"API Design v2\",\n      \"workspace\": \"6485111c-25b7-4b51-831b-bde5f700c069\",\n      \"status\": \"published\",\n      \"tags\": [],\n      \"created_by\": {\n        \"id\": \"2\",\n        \"username\": \"bob\"\n      },\n      \"version_count\": 3,\n      \"created_at\": \"2026-10-09T07:58:36.160361Z\",\n      \"updated_at\": \"2026-10-09T07:58:36.580794Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Filter documents",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/?workspace={{workspace_id}}&status_in=draft,published&search=design&updated_after=2026-01-01&updated_before=2026-12-31",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents"
+              ],
+              "query": [
+                {
+                  "key": "workspace",
+                  "value": "{{workspace_id}}"
+                },
+                {
+                  "key": "status_in",
+                  "value": "draft,published"
+                },
+                {
+                  "key": "search",
+                  "value": "design"
+                },
+                {
+                  "key": "updated_after",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "updated_before",
+                  "value": "2026-12-31"
+                }
+              ]
+            },
+            "description": "Filters: workspace (UUID), status, status_in (comma list), tag (name), search (title/content, case-insensitive), created_by (user id), updated_after / updated_before (ISO date or datetime). Disable/enable params in the Params tab. Malformed values return 400."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/?workspace={{workspace_id}}&status_in=draft,published&search=design&updated_after=2026-01-01&updated_before=2026-12-31",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents"
+                  ],
+                  "query": [
+                    {
+                      "key": "workspace",
+                      "value": "{{workspace_id}}"
+                    },
+                    {
+                      "key": "status_in",
+                      "value": "draft,published"
+                    },
+                    {
+                      "key": "search",
+                      "value": "design"
+                    },
+                    {
+                      "key": "updated_after",
+                      "value": "2026-01-01"
+                    },
+                    {
+                      "key": "updated_before",
+                      "value": "2026-12-31"
+                    }
+                  ]
+                },
+                "description": "Filters: workspace (UUID), status, status_in (comma list), tag (name), search (title/content, case-insensitive), created_by (user id), updated_after / updated_before (ISO date or datetime). Disable/enable params in the Params tab. Malformed values return 400."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"count\": 1,\n  \"next\": null,\n  \"previous\": null,\n  \"results\": [\n    {\n      \"id\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n      \"title\": \"API Design v2\",\n      \"workspace\": \"6485111c-25b7-4b51-831b-bde5f700c069\",\n      \"status\": \"published\",\n      \"tags\": [],\n      \"created_by\": {\n        \"id\": \"2\",\n        \"username\": \"bob\"\n      },\n      \"version_count\": 3,\n      \"created_at\": \"2026-10-09T07:58:36.160361Z\",\n      \"updated_at\": \"2026-10-09T07:58:36.580794Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Filter documents by tag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/?tag=planning",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents"
+              ],
+              "query": [
+                {
+                  "key": "tag",
+                  "value": "planning"
+                }
+              ]
+            },
+            "description": "Documents tagged 'planning' (seed_demo tags 'Project Plan')."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/?tag=planning",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents"
+                  ],
+                  "query": [
+                    {
+                      "key": "tag",
+                      "value": "planning"
+                    }
+                  ]
+                },
+                "description": "Documents tagged 'planning' (seed_demo tags 'Project Plan')."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"count\": 1,\n  \"next\": null,\n  \"previous\": null,\n  \"results\": [\n    {\n      \"id\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n      \"title\": \"Project Plan\",\n      \"workspace\": \"6485111c-25b7-4b51-831b-bde5f700c069\",\n      \"status\": \"published\",\n      \"tags\": [\n        \"backend\",\n        \"planning\"\n      ],\n      \"created_by\": {\n        \"id\": \"2\",\n        \"username\": \"bob\"\n      },\n      \"version_count\": 3,\n      \"created_at\": \"2026-10-09T07:58:36.160361Z\",\n      \"updated_at\": \"2026-10-09T07:58:36.580794Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Filter documents - invalid params (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/?status=deleted&workspace=abc&updated_after=yesterday",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "deleted"
+                },
+                {
+                  "key": "workspace",
+                  "value": "abc"
+                },
+                {
+                  "key": "updated_after",
+                  "value": "yesterday"
+                }
+              ]
+            },
+            "description": "Shows field-level validation errors for query parameters."
+          },
+          "response": [
+            {
+              "name": "400 Bad Request",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/?status=deleted&workspace=abc&updated_after=yesterday",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "deleted"
+                    },
+                    {
+                      "key": "workspace",
+                      "value": "abc"
+                    },
+                    {
+                      "key": "updated_after",
+                      "value": "yesterday"
+                    }
+                  ]
+                },
+                "description": "Shows field-level validation errors for query parameters."
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"workspace\": [\n    \"Must be a valid UUID.\"\n  ],\n  \"status\": [\n    \"\\\"deleted\\\" is not a valid status. Choose one of: draft, published, archived.\"\n  ],\n  \"updated_after\": [\n    \"Use an ISO 8601 date (YYYY-MM-DD) or datetime (YYYY-MM-DDTHH:MM[:SS][TZ]).\"\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Retrieve document",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/{{document_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "{{document_id}}"
+              ]
+            },
+            "description": "404 for unknown/malformed ids and for documents in workspaces you are not a member of."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}"
+                  ]
+                },
+                "description": "404 for unknown/malformed ids and for documents in workspaces you are not a member of."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n  \"title\": \"API Design\",\n  \"content\": \"Draft 1\",\n  \"workspace\": \"6485111c-25b7-4b51-831b-bde5f700c069\",\n  \"status\": \"draft\",\n  \"tags\": [],\n  \"created_by\": {\n    \"id\": \"2\",\n    \"username\": \"bob\"\n  },\n  \"version_count\": 1,\n  \"created_at\": \"2026-10-09T07:58:36.160361Z\",\n  \"updated_at\": \"2026-10-09T07:58:36.160372Z\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}"
+                  ]
+                },
+                "description": "404 for unknown/malformed ids and for documents in workspaces you are not a member of."
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"No Document matches the given query.\",\n  \"code\": \"not_found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update document (PUT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+                  "pm.test(\"New version recorded\", function () { pm.expect(pm.response.json().version_count).to.be.above(1); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/{{document_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "{{document_id}}"
+              ]
+            },
+            "description": "Full update (title and content required; workspace may be omitted and cannot change). Locks the row, computes versions.count()+1, saves and snapshots a new version atomically.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"API Design v2\",\n  \"content\": \"Draft 2\",\n  \"status\": \"published\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}"
+                  ]
+                },
+                "description": "Full update (title and content required; workspace may be omitted and cannot change). Locks the row, computes versions.count()+1, saves and snapshots a new version atomically.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"API Design v2\",\n  \"content\": \"Draft 2\",\n  \"status\": \"published\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n  \"title\": \"API Design v2\",\n  \"content\": \"Draft 2\",\n  \"workspace\": \"6485111c-25b7-4b51-831b-bde5f700c069\",\n  \"status\": \"published\",\n  \"tags\": [],\n  \"created_by\": {\n    \"id\": \"2\",\n    \"username\": \"bob\"\n  },\n  \"version_count\": 2,\n  \"created_at\": \"2026-10-09T07:58:36.160361Z\",\n  \"updated_at\": \"2026-10-09T07:58:36.437454Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Partially update document (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/{{document_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "{{document_id}}"
+              ]
+            },
+            "description": "Fields not sent keep their values (content is preserved if omitted). Every successful update adds a version.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Draft 3\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}"
+                  ]
+                },
+                "description": "Fields not sent keep their values (content is preserved if omitted). Every successful update adds a version.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"content\": \"Draft 3\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n  \"title\": \"API Design v2\",\n  \"content\": \"Draft 3\",\n  \"workspace\": \"6485111c-25b7-4b51-831b-bde5f700c069\",\n  \"status\": \"published\",\n  \"tags\": [],\n  \"created_by\": {\n    \"id\": \"2\",\n    \"username\": \"bob\"\n  },\n  \"version_count\": 3,\n  \"created_at\": \"2026-10-09T07:58:36.160361Z\",\n  \"updated_at\": \"2026-10-09T07:58:36.580794Z\"\n}"
+            },
+            {
+              "name": "403 Forbidden (viewer)",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}"
+                  ]
+                },
+                "description": "Fields not sent keep their values (content is preserved if omitted). Every successful update adds a version.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"content\": \"Draft 3\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Your workspace role does not allow this action.\",\n  \"code\": \"permission_denied\"\n}"
+            },
+            {
+              "name": "409 Conflict",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}"
+                  ]
+                },
+                "description": "Fields not sent keep their values (content is preserved if omitted). Every successful update adds a version.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"content\": \"Draft 3\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Another change to this document was saved at the same time. Reload and try again.\",\n  \"code\": \"version_conflict\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Versions",
+      "item": [
+        {
+          "name": "List versions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });",
+                  "const rows = pm.response.json();",
+                  "if (rows.length) { pm.collectionVariables.set(\"version_id\", rows[0].id); }",
+                  "pm.test(\"Ascending order\", function () {",
+                  "  const nums = rows.map(r => r.version_number);",
+                  "  pm.expect(nums).to.eql([...nums].sort((a, b) => a - b));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/{{document_id}}/versions/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "{{document_id}}",
+                "versions"
+              ]
+            },
+            "description": "All versions in ascending version_number order (content omitted; fetch a version for its snapshot)."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/versions/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}",
+                    "versions"
+                  ]
+                },
+                "description": "All versions in ascending version_number order (content omitted; fetch a version for its snapshot)."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"id\": \"cddd81ab-8ab5-4eee-9c10-00ae715ec290\",\n    \"document\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n    \"version_number\": 1,\n    \"saved_by\": {\n      \"id\": \"2\",\n      \"username\": \"bob\"\n    },\n    \"saved_at\": \"2026-10-09T07:58:36.171033Z\",\n    \"restored_from\": null\n  },\n  {\n    \"id\": \"9e9b5315-835c-4fc2-bc5d-4424067c9008\",\n    \"document\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n    \"version_number\": 2,\n    \"saved_by\": {\n      \"id\": \"2\",\n      \"username\": \"bob\"\n    },\n    \"saved_at\": \"2026-10-09T07:58:36.441164Z\",\n    \"restored_from\": null\n  },\n  {\n    \"id\": \"6c9ecfc2-f073-4bfc-8143-b464476c41ed\",\n    \"document\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n    \"version_number\": 3,\n    \"saved_by\": {\n      \"id\": \"2\",\n      \"username\": \"bob\"\n    },\n    \"saved_at\": \"2026-10-09T07:58:36.584399Z\",\n    \"restored_from\": null\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Retrieve version",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/{{document_id}}/versions/{{version_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "{{document_id}}",
+                "versions",
+                "{{version_id}}"
+              ]
+            },
+            "description": "404 if the version does not exist or belongs to a different document."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/versions/{{version_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}",
+                    "versions",
+                    "{{version_id}}"
+                  ]
+                },
+                "description": "404 if the version does not exist or belongs to a different document."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"cddd81ab-8ab5-4eee-9c10-00ae715ec290\",\n  \"document\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n  \"version_number\": 1,\n  \"content\": \"Draft 1\",\n  \"saved_by\": {\n    \"id\": \"2\",\n    \"username\": \"bob\"\n  },\n  \"saved_at\": \"2026-10-09T07:58:36.171033Z\",\n  \"restored_from\": null,\n  \"restored_from_version\": null\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/versions/{{version_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}",
+                    "versions",
+                    "{{version_id}}"
+                  ]
+                },
+                "description": "404 if the version does not exist or belongs to a different document."
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Version not found for this document.\",\n  \"code\": \"not_found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Restore version",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", function () { pm.response.to.have.status(201); });",
+                  "pm.test(\"Restore created a new version\", function () { pm.expect(pm.response.json().version.restored_from).to.eql(pm.collectionVariables.get(\"version_id\")); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/{{document_id}}/versions/{{version_id}}/restore/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "{{document_id}}",
+                "versions",
+                "{{version_id}}",
+                "restore"
+              ]
+            },
+            "description": "Copies the selected version's content onto the document and records it as a NEW version (e.g. restoring v1 when v1-v3 exist creates v4). History is never overwritten. Admin/editor only."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/versions/{{version_id}}/restore/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}",
+                    "versions",
+                    "{{version_id}}",
+                    "restore"
+                  ]
+                },
+                "description": "Copies the selected version's content onto the document and records it as a NEW version (e.g. restoring v1 when v1-v3 exist creates v4). History is never overwritten. Admin/editor only."
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"document\": {\n    \"id\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n    \"title\": \"API Design v2\",\n    \"content\": \"Draft 1\",\n    \"workspace\": \"6485111c-25b7-4b51-831b-bde5f700c069\",\n    \"status\": \"published\",\n    \"tags\": [],\n    \"created_by\": {\n      \"id\": \"2\",\n      \"username\": \"bob\"\n    },\n    \"version_count\": 4,\n    \"created_at\": \"2026-10-09T07:58:36.160361Z\",\n    \"updated_at\": \"2026-10-09T07:58:44.845360Z\"\n  },\n  \"version\": {\n    \"id\": \"762ed3cd-30be-4573-8974-6b7634771f73\",\n    \"document\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n    \"version_number\": 4,\n    \"content\": \"Draft 1\",\n    \"saved_by\": {\n      \"id\": \"2\",\n      \"username\": \"bob\"\n    },\n    \"saved_at\": \"2026-10-09T07:58:44.848755Z\",\n    \"restored_from\": \"cddd81ab-8ab5-4eee-9c10-00ae715ec290\",\n    \"restored_from_version\": 1\n  },\n  \"restored_from_version\": 1\n}"
+            }
+          ]
+        },
+        {
+          "name": "Document statistics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/{{document_id}}/stats/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "{{document_id}}",
+                "stats"
+              ]
+            },
+            "description": "version_count, comment_count, contributor_count (distinct users who saved a version or commented), latest_version_number, last_saved_at. Computed with separate aggregate queries."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/stats/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}",
+                    "stats"
+                  ]
+                },
+                "description": "version_count, comment_count, contributor_count (distinct users who saved a version or commented), latest_version_number, last_saved_at. Computed with separate aggregate queries."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"document_id\": \"c0e7b4a5-7f79-4e83-86d3-c217e4cc4281\",\n  \"version_count\": 4,\n  \"latest_version_number\": 4,\n  \"last_saved_at\": \"2026-10-09T07:58:44.848755Z\",\n  \"comment_count\": 0,\n  \"contributor_count\": 1\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cleanup",
+      "item": [
+        {
+          "name": "Delete document",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/documents/{{document_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "{{document_id}}"
+              ]
+            },
+            "description": "Workspace admins, or the editor who created the document. Versions are removed by on_delete=CASCADE."
+          },
+          "response": [
+            {
+              "name": "204 No Content",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}"
+                  ]
+                },
+                "description": "Workspace admins, or the editor who created the document. Versions are removed by on_delete=CASCADE."
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": ""
+            },
+            {
+              "name": "403 Forbidden",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/documents/{{document_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "documents",
+                    "{{document_id}}"
+                  ]
+                },
+                "description": "Workspace admins, or the editor who created the document. Versions are removed by on_delete=CASCADE."
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Only workspace admins, or the editor who created it, can delete a document.\",\n  \"code\": \"permission_denied\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,22 +1,38 @@
-"""
-Middleware that publishes the current request to `core.context`.
+import time
 
-MERGE NOTE: Person A owns the project's request-logging middleware. Do not run two
-middlewares. On merge, add the three marked lines from this file into A's middleware
-(see INTEGRATION.md) and delete this file + its entry in settings.MIDDLEWARE.
-"""
-from .context import reset_request, set_request
+from core.context import reset_request, set_request
 
 
-class RequestContextMiddleware:
-    """Make the request available to signal handlers via `core.context.current_user()`."""
+class AuditContextMiddleware:
+    """Publishes the current request so audit signal handlers can record the acting user.
+
+    The user is read lazily at signal time (see core/context.py), so this works for DRF token
+    authentication, which happens inside the view, after middleware has run.
+    """
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        token = set_request(request)          # <-- line 1 to copy into A's middleware
+        token = set_request(request)
         try:
             return self.get_response(request)
         finally:
-            reset_request(token)              # <-- line 2 to copy into A's middleware
+            reset_request(token)
+
+
+class RequestLoggingMiddleware:
+    """Prints: METHOD  /path  status  time_in_ms for every request."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        start = time.perf_counter()
+        response = self.get_response(request)
+        duration_ms = (time.perf_counter() - start) * 1000
+        print(
+            f"[REQUEST] {request.method} {request.path} "
+            f"-> {response.status_code} ({duration_ms:.2f} ms)"
+        )
+        return response

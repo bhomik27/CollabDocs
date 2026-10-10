@@ -1,12 +1,12 @@
 """
-`python manage.py check_integration` - run this right after merging A, B and C.
+`python manage.py check_integration` - verifies the contracts between Person A's, B's and C's apps.
 
-It checks every assumption Person C's code makes about the rest of the project and prints
-PASS / WARN / FAIL with the exact fix, so a mismatch is found in seconds instead of by
-reading a stack trace. Exit code is 1 if anything FAILs.
+It checks every assumption the comments/tags/audit and documents code makes about the rest of
+the project and prints PASS / WARN / FAIL with the exact fix. Exit code is 1 if anything FAILs.
 """
 import importlib
 import inspect
+import uuid
 
 from django.apps import apps
 from django.conf import settings
@@ -17,22 +17,24 @@ from django.urls import NoReverseMatch, reverse
 from audit.registry import registered_models
 from core.access import ROLE_RANK
 
-INTEGER_PK = (models.AutoField, models.BigAutoField, models.SmallAutoField, models.IntegerField)
+AUDIT_ID_MODELS = (("workspaces", "Workspace"), ("workspaces", "WorkspaceMember"), ("documents", "Document"))
 
+_U = uuid.UUID(int=1)
 URL_CHECKS = [
-    ("document-comments", [1]), ("comment-detail", [1]),
-    ("workspace-tags", [1]), ("tag-detail", [1]), ("document-tag-attach", [1]), ("document-tag-detach", [1, 1]),
-    ("workspace-audit-logs", [1]), ("audit-log-detail", [1]),
+    ("document-comments", [_U]), ("comment-detail", [1]),
+    ("workspace-tags", [_U]), ("tag-detail", [1]), ("document-tag-attach", [_U]), ("document-tag-detach", [_U, 1]),
+    ("workspace-audit-logs", [_U]), ("audit-log-detail", [1]),
 ]
 
 
 class Command(BaseCommand):
-    help = "Verify Person C's assumptions about Person A's and Person B's code."
+    help = "Verify the integration contracts between the users/workspaces, documents and comments/tags/audit apps."
 
     def handle(self, *args, **options):
         self.failed = False
         self.check_models()
         self.check_roles()
+        self.check_tags_relation()
         self.check_middleware()
         self.check_drf_settings()
         self.check_audit_registrations()
@@ -56,28 +58,35 @@ class Command(BaseCommand):
 
     # ---- checks ----
     def check_models(self):
-        for label, name in (("workspaces", "Workspace"), ("workspaces", "Membership"), ("documents", "Document")):
+        audit_log = apps.get_model("audit", "AuditLog")
+        if isinstance(audit_log._meta.get_field("workspace_id"), models.UUIDField):
+            self.ok("AuditLog.workspace_id is a UUIDField")
+        else:
+            self.fail("AuditLog.workspace_id must be a UUIDField (workspaces use UUID primary keys).")
+        if isinstance(audit_log._meta.get_field("target_id"), models.CharField):
+            self.ok("AuditLog.target_id is a CharField (holds UUID and integer primary keys)")
+        else:
+            self.fail("AuditLog.target_id must be a CharField: audited models mix UUID and integer primary keys.")
+
+        workspace = apps.get_model("workspaces", "Workspace")
+        if isinstance(workspace._meta.pk, models.UUIDField):
+            self.ok("workspaces.Workspace has a UUID primary key (matches AuditLog.workspace_id)")
+        else:
+            self.fail("workspaces.Workspace primary key is not a UUID; AuditLog.workspace_id and the URL converters assume UUIDs.")
+
+        for label, name in AUDIT_ID_MODELS:
             try:
-                model = apps.get_model(label, name)
+                apps.get_model(label, name)
+                self.ok(f"{label}.{name} exists")
             except LookupError:
-                self.fail(f"{label}.{name} not found. Person {'B' if label == 'documents' else 'A'}'s app must be in "
-                          f"INSTALLED_APPS with a model named {name} (else edit the imports in core/access.py).")
-                continue
-            self.ok(f"{label}.{name} exists")
-            if not isinstance(model._meta.pk, INTEGER_PK):
-                self.fail(f"{label}.{name} has a non-integer primary key ({type(model._meta.pk).__name__}). "
-                          "AuditLog and the URL patterns assume integer ids (see INTEGRATION.md, 'Integer ids').")
-        User = settings.AUTH_USER_MODEL
-        user_model = apps.get_model(User)
-        if not isinstance(user_model._meta.pk, INTEGER_PK):
-            self.fail(f"{User} has a non-integer primary key; brief_user/AuditLog.actor assume integer-compatible ids.")
+                self.fail(f"{label}.{name} not found (core/access.py and documents/integration.py import it).")
         try:
-            membership = apps.get_model("workspaces", "Membership")
+            member = apps.get_model("workspaces", "WorkspaceMember")
             for field in ("workspace", "user", "role"):
-                membership._meta.get_field(field)
-            self.ok("Membership has fields workspace, user, role")
+                member._meta.get_field(field)
+            self.ok("WorkspaceMember has fields workspace, user, role")
         except Exception:
-            self.fail("Membership must have fields named 'workspace', 'user' and 'role' - or adapt core/access.py.")
+            self.fail("WorkspaceMember must have fields named 'workspace', 'user' and 'role' - or adapt core/access.py.")
         try:
             document = apps.get_model("documents", "Document")
             if document._meta.get_field("workspace").many_to_one:
@@ -86,65 +95,64 @@ class Command(BaseCommand):
             self.fail("Document must have a ForeignKey named 'workspace' (comments, tags and audit resolve workspace through it).")
 
     def check_roles(self):
-        try:
-            role_field = apps.get_model("workspaces", "Membership")._meta.get_field("role")
-        except Exception:
-            return
-        if role_field.is_relation:
-            self.warn("Membership.role is a relation, not a string. Adapt get_role()/has_role() in core/access.py.")
-            return
-        if not role_field.choices:
-            self.warn("Membership.role has no choices, so role names cannot be verified. "
-                      f"Person C expects: {', '.join(ROLE_RANK)} (edit ROLE_RANK in core/access.py if A's names differ).")
-            return
-        theirs = {value for value, _ in role_field.choices}
+        role_field = apps.get_model("workspaces", "WorkspaceMember")._meta.get_field("role")
+        theirs = {value for value, _ in role_field.choices or []}
         missing = set(ROLE_RANK) - theirs
         extra = theirs - set(ROLE_RANK)
         if missing:
-            self.fail(f"Membership.role has no value(s) {sorted(missing)} that core/access.py ROLE_RANK uses. "
-                      "Map A's role names in ROLE_RANK.")
+            self.fail(f"core/access.py ROLE_RANK uses role(s) {sorted(missing)} that WorkspaceMember.Role does not define.")
         else:
-            self.ok("Membership.role values cover viewer/editor/admin/owner")
+            self.ok(f"WorkspaceMember.role values match ROLE_RANK ({', '.join(ROLE_RANK)})")
         if extra:
-            self.warn(f"Membership.role has extra values {sorted(extra)} not in ROLE_RANK - they rank as 0 (no permissions).")
+            self.warn(f"WorkspaceMember.role has extra values {sorted(extra)} not in ROLE_RANK - they rank as 0 (no permissions).")
+
+    def check_tags_relation(self):
+        relation = getattr(settings, "COLLABDOCS_DOCUMENT_TAGS_RELATION", None)
+        if not relation:
+            self.warn("COLLABDOCS_DOCUMENT_TAGS_RELATION is unset: document tag filtering/prefetching is disabled.")
+            return
+        try:
+            related = apps.get_model("documents", "Document")._meta.get_field(relation).related_model
+            related._meta.get_field("name")
+            self.ok(f"Document.{relation} reaches {related._meta.label}.name (tag filter and serializer work)")
+        except Exception:
+            self.fail(f"Document.{relation} must be a relation to a model with a 'name' field (tags.Tag via Tag.documents).")
 
     def check_middleware(self):
         for path in settings.MIDDLEWARE:
             try:
-                module = importlib.import_module(path.rsplit(".", 1)[0])
-                if "set_request" in inspect.getsource(module):
+                module_path, class_name = path.rsplit(".", 1)
+                middleware = getattr(importlib.import_module(module_path), class_name)
+                if "set_request" in inspect.getsource(middleware):
                     self.ok(f"{path} publishes the request via core.context.set_request (audit actor will be recorded)")
                     return
             except Exception:
                 continue
         self.fail("No middleware calls core.context.set_request(). Audit entries would have actor = null. "
-                  "Add the 2 lines to Person A's middleware (INTEGRATION.md section 4.3).")
+                  "Add core.middleware.AuditContextMiddleware to MIDDLEWARE.")
 
     def check_drf_settings(self):
         rest = getattr(settings, "REST_FRAMEWORK", {})
         if rest.get("DEFAULT_PAGINATION_CLASS"):
             self.ok("DRF pagination is configured")
         else:
-            self.warn("REST_FRAMEWORK has no DEFAULT_PAGINATION_CLASS: list endpoints will return bare lists instead of "
-                      "{count, next, previous, results}. Postman tests written for Person C assume pagination.")
+            self.warn("REST_FRAMEWORK has no DEFAULT_PAGINATION_CLASS: comment/tag/audit/document lists would return "
+                      "bare lists instead of {count, next, previous, results}.")
         perms = rest.get("DEFAULT_PERMISSION_CLASSES", [])
         if any("IsAuthenticated" in p for p in perms):
             self.ok("DRF default permission is IsAuthenticated")
         else:
-            self.warn("DEFAULT_PERMISSION_CLASSES does not include IsAuthenticated; anonymous users would reach C's views "
+            self.warn("DEFAULT_PERMISSION_CLASSES does not include IsAuthenticated; anonymous users would reach the views "
                       "(they would still get 404 because they are not members).")
 
     def check_audit_registrations(self):
         registered = {m._meta.label for m in registered_models()}
-        for label in ("comments.Comment", "tags.Tag", "tags.DocumentTag"):
-            (self.ok if label in registered else self.fail)(f"{label} is audited" if label in registered
-                                                           else f"{label} is NOT registered with audit (audit/apps.py).")
-        for label, owner in (("documents.Document", "B"), ("workspaces.Workspace", "A"), ("workspaces.Membership", "A")):
-            if label not in registered:
-                self.warn(f"{label} is not audited yet. Person {owner}: add register(...) in your AppConfig.ready() "
-                          "(INTEGRATION.md section 4.4).")
-            else:
+        for label in ("comments.Comment", "tags.Tag", "tags.DocumentTag",
+                      "documents.Document", "workspaces.Workspace", "workspaces.WorkspaceMember"):
+            if label in registered:
                 self.ok(f"{label} is audited")
+            else:
+                self.fail(f"{label} is NOT registered with audit (register(...) in its app's AppConfig.ready()).")
 
     def check_urls(self):
         bad = []
@@ -156,4 +164,4 @@ class Command(BaseCommand):
         if bad:
             self.fail(f"URL names not resolvable: {bad}. Add path('api/', include('<app>.urls')) to the root urls.py.")
         else:
-            self.ok("All 14 of Person C's endpoints are routed (8 URL patterns)")
+            self.ok("All comment, tag and audit endpoints are routed (8 URL patterns)")

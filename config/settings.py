@@ -1,76 +1,161 @@
 """
-Standalone settings for developing Person C's apps (comments, tags, audit).
+Django settings for the CollabDocs project.
 
-MERGE NOTE: on merge day you do NOT replace the team's settings.py with this file.
-Copy only the lines marked ">>> PERSON C" into the team settings (see INTEGRATION.md).
+All secrets and database credentials come from environment variables
+(optionally loaded from a local, git-ignored ``.env`` file).
+See ``.env.example`` for the full list.
 """
+
 import os
-import sys
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# >>> STUB ONLY - delete this line on merge. It makes the stub `workspaces` and
-# `documents` apps importable so Person C can work before A and B push their code.
-sys.path.insert(0, str(BASE_DIR / "STUBS_DO_NOT_MERGE"))
+load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-change-me")
-DEBUG = os.environ.get("DEBUG", "1") == "1"
-ALLOWED_HOSTS = ["*"]
+
+def env(name, default=None, required=False):
+    value = os.environ.get(name, default)
+    if required and not value:
+        raise ImproperlyConfigured(f"Environment variable {name} is required.")
+    return value
+
+
+def env_bool(name, default=False):
+    return str(os.environ.get(name, default)).strip().lower() in {"1", "true", "yes", "on"}
+
+
+DEBUG = env_bool("DJANGO_DEBUG", False)
+
+SECRET_KEY = env("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        # Development-only fallback so a fresh clone can run tests immediately.
+        SECRET_KEY = "dev-only-insecure-key-do-not-use-in-production"
+    else:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false.")
+
+ALLOWED_HOSTS = [h.strip() for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+
 
 INSTALLED_APPS = [
+    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     "rest_framework",
-    # >>> STUB ONLY - replaced by Person A's and Person B's real apps on merge
+    "rest_framework.authtoken",
+    "users",
     "workspaces",
     "documents",
-    # >>> PERSON C
     "comments",
     "tags",
     "audit",
 ]
 
 MIDDLEWARE = [
+    "core.middleware.RequestLoggingMiddleware",
+    "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    # >>> PERSON C (stand-in for Person A's request-logging middleware; see INTEGRATION.md)
-    "core.middleware.RequestContextMiddleware",
+    "core.middleware.AuditContextMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
 WSGI_APPLICATION = "config.wsgi.application"
 
-# SQLite by default so the project runs anywhere; set DB_NAME to use PostgreSQL.
-if os.environ.get("DB_NAME"):
+
+# Database: PostgreSQL is the target. SQLite is an explicit opt-in for
+# machines without PostgreSQL (it can NOT prove row-locking behaviour).
+if env_bool("USE_SQLITE", False):
     DATABASES = {
         "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.environ["DB_NAME"],
-            "USER": os.environ.get("DB_USER", "postgres"),
-            "PASSWORD": os.environ.get("DB_PASSWORD", ""),
-            "HOST": os.environ.get("DB_HOST", "localhost"),
-            "PORT": os.environ.get("DB_PORT", "5432"),
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
         }
     }
 else:
-    DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("POSTGRES_DB", "collabdocs"),
+            "USER": env("POSTGRES_USER", "collabdocs"),
+            "PASSWORD": env("POSTGRES_PASSWORD", ""),
+            "HOST": env("POSTGRES_HOST", "localhost"),
+            "PORT": env("POSTGRES_PORT", "5432"),
+            "CONN_MAX_AGE": int(env("POSTGRES_CONN_MAX_AGE", "60")),
+        }
+    }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-USE_TZ = True
-TIME_ZONE = "UTC"
 
-# >>> PERSON C needs: authenticated-by-default, and pagination (list endpoints return
-# {"count", "next", "previous", "results"}). Person A's JWT/Token auth class replaces the two
-# stand-in auth classes below.
+AUTH_USER_MODEL = "users.User"
+
+# Integration model labels read by documents/integration.py.
+COLLABDOCS_WORKSPACE_MODEL = "workspaces.Workspace"
+COLLABDOCS_WORKSPACE_MEMBER_MODEL = "workspaces.WorkspaceMember"
+COLLABDOCS_COMMENT_MODEL = "comments.Comment"
+COLLABDOCS_DOCUMENT_TAGS_RELATION = "tags"  # reverse of tags.Tag.documents (through DocumentTag)
+
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = "static/"
+
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
     ],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    "EXCEPTION_HANDLER": "documents.exceptions.api_exception_handler",
+}
+
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {
+        "documents": {"handlers": ["console"], "level": env("DOCUMENTS_LOG_LEVEL", "WARNING")},
+    },
 }

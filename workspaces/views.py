@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.permissions import IsWorkspaceAdmin, IsWorkspaceMember
+from core.utils import parse_query_value
 from .models import Workspace, WorkspaceMember
 from .serializers import AddMemberSerializer, WorkspaceMemberSerializer, WorkspaceSerializer
 
@@ -15,9 +16,11 @@ User = get_user_model()
 
 class WorkspaceViewSet(viewsets.ModelViewSet):
     serializer_class = WorkspaceSerializer
+    pagination_class = None  # list keeps returning a plain JSON array (Person A's API contract)
 
     def get_permissions(self):
-        if self.action in ("update", "partial_update", "destroy", "add_member"):
+        # Adding a member (POST .../members/) is admin-only; checked in _add_member().
+        if self.action in ("update", "partial_update", "destroy"):
             return [IsAuthenticated(), IsWorkspaceAdmin()]
         if self.action in ("retrieve", "members", "stats"):
             return [IsAuthenticated(), IsWorkspaceMember()]
@@ -47,9 +50,9 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
         if is_active in ("true", "false"):
             qs = qs.filter(is_active=(is_active == "true"))
         if params.get("created_after"):  # __gte
-            qs = qs.filter(created_at__gte=params["created_after"])
+            qs = qs.filter(created_at__gte=parse_query_value(Workspace, "created_at", "created_after", params["created_after"]))
         if params.get("created_before"):  # __lte
-            qs = qs.filter(created_at__lte=params["created_before"])
+            qs = qs.filter(created_at__lte=parse_query_value(Workspace, "created_at", "created_before", params["created_before"]))
         return qs
 
     def create(self, request, *args, **kwargs):

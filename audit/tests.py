@@ -21,7 +21,7 @@ class AuditSignalTests(BaseAPITestCase):
         entry = AuditLog.objects.get()  # exactly one row: AuditLog does not audit itself
         self.assertEqual(entry.action, "create")
         self.assertEqual(entry.target_type, "comment")
-        self.assertEqual(entry.target_id, res.data["id"])
+        self.assertEqual(entry.target_id, str(res.data["id"]))
         self.assertEqual(entry.workspace_id, self.ws.pk)
         self.assertEqual(entry.actor, self.users["editor"])  # proves the middleware/contextvar trick works
         self.assertEqual(entry.changes["body"], "hello")
@@ -48,7 +48,7 @@ class AuditSignalTests(BaseAPITestCase):
         self.login("editor")
         self.client.delete(reverse("comment-detail", args=[pk]))
         entry = AuditLog.objects.get()
-        self.assertEqual((entry.action, entry.target_id), ("delete", pk))
+        self.assertEqual((entry.action, entry.target_id), ("delete", str(pk)))
         self.assertEqual(entry.changes["body"], "bye")
 
     def test_cascade_delete_logs_each_reply(self):
@@ -75,6 +75,28 @@ class AuditSignalTests(BaseAPITestCase):
         self.login("editor")
         self.client.post(reverse("document-comments", args=[self.doc.pk]), {"body": ""})  # 400
         self.assertEqual(AuditLog.objects.count(), 0)
+
+    def test_person_a_and_b_models_are_registered(self):
+        from documents.models import Document
+        from workspaces.models import Workspace, WorkspaceMember
+
+        for model in (Workspace, WorkspaceMember, Document):
+            self.assertIn(model, registered_models())
+
+    def test_user_deleting_own_account_cascades_with_null_actor(self):
+        """Workspace.owner cascades into audited rows; their actor must not be the deleted user."""
+        owner = self.users["owner"]
+        Comment.objects.create(document=self.doc, author=self.users["editor"], body="x")
+        AuditLog.objects.all().delete()
+        self.login("owner")
+        res = self.client.delete(reverse("user-detail", args=[owner.pk]))
+        self.assertEqual(res.status_code, 204)
+        deletes = AuditLog.objects.filter(action="delete")
+        self.assertEqual(
+            set(deletes.values_list("target_type", flat=True)),
+            {"workspace", "workspacemember", "document", "comment"},
+        )
+        self.assertFalse(deletes.exclude(actor=None).exists())
 
     def test_audit_entries_cannot_be_modified(self):
         entry = AuditLog.objects.create(action="create", target_type="x", target_id=1)

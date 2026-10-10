@@ -6,10 +6,10 @@ Any app (A, B or C) turns on auditing for a model with ONE call, normally in its
     from audit.registry import register
     register(Document, lambda doc: doc.workspace_id)
 
-`register` connects the three Django signals (pre_save, post_save, post_delete) for that model
+`register` connects four Django signals (pre_save, post_save, pre_delete, post_delete) for that model
 only, so un-registered models cost nothing.
 """
-from django.db.models.signals import post_delete, post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 
 _REGISTRY = {}  # model class -> (workspace_resolver, target_type)
 
@@ -27,6 +27,7 @@ def register(model, workspace_resolver, target_type=None):
     uid = f"audit-{model._meta.label_lower}"
     pre_save.connect(signals.snapshot_before_save, sender=model, dispatch_uid=f"{uid}-pre")
     post_save.connect(signals.write_save_entry, sender=model, dispatch_uid=f"{uid}-post")
+    pre_delete.connect(signals.snapshot_before_delete, sender=model, dispatch_uid=f"{uid}-pre-del")
     post_delete.connect(signals.write_delete_entry, sender=model, dispatch_uid=f"{uid}-del")
 
 

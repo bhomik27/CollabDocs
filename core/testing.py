@@ -5,30 +5,42 @@ Builds two workspaces and one user per role so every permission rule can be test
   workspace 1: owner, admin, editor, viewer   (+ document `doc`)
   workspace 2: other_owner                    (+ document `other_doc`)
   outsider: belongs to no workspace
+
+"owner" is Workspace.owner and, as in Person A's create flow, holds an admin membership.
 """
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
+from audit.models import AuditLog
 from documents.models import Document
-from workspaces.models import Membership, Workspace
+from workspaces.models import Workspace, WorkspaceMember
+
+
+def make_user(username):
+    # User.email is unique, so every fixture user needs its own address.
+    return get_user_model().objects.create_user(username=username, email=f"{username}@example.com", password="x")
 
 
 class BaseAPITestCase(APITestCase):
     @classmethod
     def setUpTestData(cls):
-        User = get_user_model()
-        cls.ws = Workspace.objects.create(name="Team")
-        cls.other_ws = Workspace.objects.create(name="Other")
-        cls.users = {}
-        for role in ("owner", "admin", "editor", "viewer"):
-            user = User.objects.create_user(username=role, password="x")
-            Membership.objects.create(workspace=cls.ws, user=user, role=role)
-            cls.users[role] = user
-        cls.outsider = User.objects.create_user(username="outsider", password="x")
-        cls.other_owner = User.objects.create_user(username="other_owner", password="x")
-        Membership.objects.create(workspace=cls.other_ws, user=cls.other_owner, role="owner")
+        cls.users = {role: make_user(role) for role in ("owner", "admin", "editor", "viewer")}
+        cls.outsider = make_user("outsider")
+        cls.other_owner = make_user("other_owner")
+
+        cls.ws = Workspace.objects.create(name="Team", owner=cls.users["owner"])
+        cls.other_ws = Workspace.objects.create(name="Other", owner=cls.other_owner)
+        member_role = {"owner": WorkspaceMember.Role.ADMIN}
+        for role, user in cls.users.items():
+            WorkspaceMember.objects.create(workspace=cls.ws, user=user, role=member_role.get(role, role))
+        WorkspaceMember.objects.create(workspace=cls.other_ws, user=cls.other_owner, role=WorkspaceMember.Role.ADMIN)
+
         cls.doc = Document.objects.create(workspace=cls.ws, title="Plan")
         cls.other_doc = Document.objects.create(workspace=cls.other_ws, title="Secret")
+
+        # Workspaces, memberships and documents are audited too; start every test with an
+        # empty log so assertions only see the rows the test itself caused.
+        AuditLog.objects.all().delete()
 
     def login(self, who):
         """Authenticate the test client as a role name ('editor'), 'outsider' or 'other_owner'."""
