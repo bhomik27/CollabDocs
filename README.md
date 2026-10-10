@@ -18,7 +18,7 @@ and an audit log. It combines three implementations; see
 
 Stack: Python 3.12+ (developed on 3.14), Django 6.0, DRF 3.18, PostgreSQL (psycopg 3).
 
-**Demo video:** <PASTE LOOM / GOOGLE DRIVE LINK HERE>
+**Demo video: https://drive.google.com/file/d/1SX0mWWZUG-oXRQHwQgeMBWLCJ7XxcIzG/view?usp=sharing
 
 **Postman collection:** [`CollabDocs.postman_collection.json`](CollabDocs.postman_collection.json) (repository root)
 
